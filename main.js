@@ -31,6 +31,25 @@ Apify.main(async () => {
                 userData: { label },
             } = context.request;
             log.info("Page opened.", { label, url });
+            log.info(context.$(".page-title").text().trim());
+            log.info(
+                context
+                    .$("p.product-new-price.has-deal")
+                    .first()
+                    .html()
+                    .replace("<sup>", ".")
+                    .split("<")[0]
+            );
+
+            log.info(context.$(".label-in_stock").text());
+            log.info(url);
+
+            // log.info(context.$(".page-title").text().trim());
+            // log.info(context.body);
+
+            // const text = context(".page-title").text();
+            // log.info(text);
+            // log.info($(".page-title").text());
             switch (label) {
                 case "LIST":
                     return handleList(context);
