@@ -1,9 +1,3 @@
-/**
- * This template is a production ready boilerplate for developing with `CheerioCrawler`.
- * Use this to bootstrap your projects using the most up-to-date code.
- * If you're looking for examples or want to learn more, see README.
- */
-
 const Apify = require("apify");
 const { handleStart, handleList, handleDetail } = require("./src/routes");
 
@@ -16,48 +10,65 @@ Apify.main(async () => {
 
     const requestList = await Apify.openRequestList("start-urls", startUrls);
     const requestQueue = await Apify.openRequestQueue();
-    // const proxyConfiguration = await Apify.createProxyConfiguration();
 
     const crawler = new Apify.CheerioCrawler({
         requestList,
         requestQueue,
-        // proxyConfiguration,
-        // Be nice to the websites.
-        // Remove to unleash full power.
         maxConcurrency: 50,
+
         handlePageFunction: async (context) => {
             const {
                 url,
                 userData: { label },
             } = context.request;
-            log.info("Page opened.", { label, url });
-            log.info(context.$(".page-title").text().trim());
-            log.info(
-                context
-                    .$("p.product-new-price.has-deal")
-                    .first()
-                    .html()
-                    .replace("<sup>", ".")
-                    .split("<")[0]
-            );
 
-            log.info(context.$(".label-in_stock").text());
-            log.info(url);
+            // Get the title
+            const title = context.$(".page-title").text().trim();
 
-            // log.info(context.$(".page-title").text().trim());
-            // log.info(context.body);
+            // Get the price
+            const price = context
+                .$("p.product-new-price")
+                .html()
+                .replace(".", "")
+                .replace("<sup>", ".")
+                .split("<")[0];
 
-            // const text = context(".page-title").text();
-            // log.info(text);
-            // log.info($(".page-title").text());
-            switch (label) {
-                case "LIST":
-                    return handleList(context);
-                case "DETAIL":
-                    return handleDetail(context);
-                default:
-                    return handleStart(context);
+            // Price validation
+            if (isNaN(price)) {
+                throw new Error(
+                    `The price is ${price}, which is not a Number. Please fix.`
+                );
             }
+
+            // Get the stock
+            let stock = context.$("div.stock-and-genius > span").first().text();
+
+            //This is all the variety of "stock's availability" that I've found on the site. There is probably more.
+            const inStock = [
+                "În stoc",
+                "Ultimul produs in stoc",
+                "Ultimele 2 produse",
+                "Ultimele 3 produse",
+            ];
+            const outOfStock = ["Indisponibil", "disponibil in showroom"];
+
+            // Stock "Translation" and validation
+            if (inStock.includes(stock)) {
+                stock = "InStock";
+            } else if (outOfStock.includes(stock)) {
+                stock = "OutOfStock";
+            } else {
+                throw new Error(
+                    `The value of stock is "${stock}" and it's is not mentioned in "inStock" or "outOfStock" variables. Please fix. Product page: ${url}`
+                );
+            }
+
+            await Apify.pushData({
+                ProductName: title,
+                ProductUrl: url,
+                Price: price,
+                Stock: stock,
+            });
         },
     });
 
